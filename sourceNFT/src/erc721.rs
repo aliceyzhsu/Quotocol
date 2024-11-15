@@ -42,12 +42,6 @@ sol_storage! {
         uint256 total_supply;
         /// Used to allow [`Erc721Params`]
         PhantomData<T> phantom;
-
-        address authority;
-        /// token_id to tokenURI
-        mapping(uint256 => string) uris;
-        /// token_id to derivatives count
-        mapping(uint256 => uint256) cnt_deriv;
     }
 }
 
@@ -237,17 +231,6 @@ impl<T: Erc721Params> Erc721<T> {
         Ok(T::SYMBOL.into())
     }
 
-    #[selector(name = "tokenURI")]
-    pub fn token_uri(&self, token_id: U256) -> Result<String, Erc721Error> {
-        self.owner_of(token_id)?; // require NFT exist
-        let uri = self.uris.get(token_id);
-        if uri.get_string().is_empty(){
-            Err(Erc721Error::NoURI(NoURITokenId { token_id }))
-        }else{
-            Ok(uri.get_string())
-        }
-    }
-
     /// Gets the number of NFTs owned by an account.
     pub fn balance_of(&self, owner: Address) -> Result<U256, Erc721Error> {
         Ok(self.balances.get(owner))
@@ -367,38 +350,6 @@ impl<T: Erc721Params> Erc721<T> {
         const IERC721_METADATA: u32 = 0x5b5e139f;
 
         Ok(matches!(u32::from_be_bytes(interface_slice_array), IERC165 | IERC721 | IERC721_METADATA))
-    }
-
-    #[selector(name = "setURI")]
-    pub fn set_uri(&mut self, token_id: U256, _uri: String) -> Result<(), Erc721Error> {
-        if self.authority.get() != msg::sender() {
-            return Err(Erc721Error::Unauthorized(NotAuthority { from: msg::sender() }));
-        }
-        let mut uri = self.uris.setter(token_id);
-        uri.set_str(_uri);
-        Ok(())
-    }
-
-    #[selector(name = "setAuthority")]
-    pub fn set_authority(&mut self, _authority: Address) -> Result<(), Erc721Error> {
-        if self.authority.get() != Address::from([0; 20]) {
-            if self.authority.get() != msg::sender() {
-                return Err(Erc721Error::Unauthorized(NotAuthority { from: msg::sender() }));
-            }
-        }
-        self.authority.set(_authority);
-        Ok(())
-    }
-
-    #[selector(name = "increDeriv")]
-    pub fn increment_derivatives(&mut self, token_id: U256) -> Result<U256, Erc721Error> {
-        if self.authority.get() != msg::sender() {
-            return Err(Erc721Error::Unauthorized(NotAuthority { from: msg::sender() }));
-        }
-        let mut cnt = self.cnt_deriv.setter(token_id);
-        let old_cnt = cnt.get();
-        cnt.set(old_cnt + U256::from(1));
-        Ok(cnt.get())
     }
 
     // #[selector(name = "mostQuoted")]

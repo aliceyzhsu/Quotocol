@@ -60,17 +60,17 @@ impl DerivativeNFT {
         Ok(self.erc721.total_supply.get())
     }
 
-    #[selector(name = "setSrcContract")]
-    pub fn set_source_contract(&mut self, contract_addr: Address) -> Result<(), Erc721Error> {
-        if self.authority.get() != msg::sender() {
-            return Err(Erc721Error::Unauthorized(erc721::NotAuthority { from: msg::sender() }));
-        }
-        evm::log(erc721::SrcContractSet{
-            src_contract_addr: contract_addr,
-        });
+    // #[selector(name = "setSrcContract")]
+    // pub fn set_source_contract(&mut self, contract_addr: Address) -> Result<(), Erc721Error> {
+    //     if self.authority.get() != msg::sender() {
+    //         return Err(Erc721Error::Unauthorized(erc721::NotAuthority { from: msg::sender() }));
+    //     }
+    //     evm::log(erc721::SrcContractSet{
+    //         src_contract_addr: contract_addr,
+    //     });
         
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     #[selector(name = "setAuthority")]
     pub fn set_authority(&mut self, _authority: Address) -> Result<(), Erc721Error> {
@@ -95,10 +95,10 @@ impl DerivativeNFT {
         }
         let mut uri = self.uris.setter(token_id);
         uri.set_str(_uri);
-        evm::log(erc721::URISet {
-            token_id: token_id,
-            uri: uri.get_string(),
-        });
+        // evm::log(erc721::URISet {
+        //     token_id: token_id,
+        //     uri: uri.get_string(),
+        // });
         Ok(())
     }
 
@@ -106,11 +106,12 @@ impl DerivativeNFT {
     pub fn token_uri(&self, token_id: U256) -> Result<String, Erc721Error> {
         self.erc721.owner_of(token_id)?; // require NFT exist
         let uri = self.uris.get(token_id);
-        if uri.get_string().is_empty(){
-            Err(Erc721Error::NoURI(erc721::NoURITokenId { token_id }))
-        }else{
-            Ok(uri.get_string())
-        }
+        // if uri.get_string().is_empty(){
+        //     Err(Erc721Error::NoURI(erc721::NoURITokenId { token_id }))
+        // }else{
+        //     Ok(uri.get_string())
+        // }
+        Ok(uri.get_string())
     }
     
     #[selector(name = "authority")]

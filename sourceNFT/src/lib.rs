@@ -27,6 +27,12 @@ sol_storage! {
     struct SourceNFT {
         #[borrow] // Allows erc721 to access StylusNFT's storage and make calls
         Erc721<SourceNFTParams> erc721;
+
+        address authority;
+        /// token_id to tokenURI
+        mapping(uint256 => string) uris;
+        /// token_id to derivatives count
+        mapping(uint256 => uint256) cnt_deriv;
     }
 }
 
@@ -58,7 +64,50 @@ impl SourceNFT {
         Ok(self.erc721.total_supply.get())
     }
 
+    #[selector(name = "setURI")]
+    pub fn set_uri(&mut self, token_id: U256, _uri: String) -> Result<(), Erc721Error> {
+        if self.authority.get() != msg::sender() {
+            return Err(Erc721Error::Unauthorized(erc721::NotAuthority { from: msg::sender() }));
+        }
+        let mut uri = self.uris.setter(token_id);
+        uri.set_str(_uri);
+        Ok(())
+    }
+
+    #[selector(name = "setAuthority")]
+    pub fn set_authority(&mut self, _authority: Address) -> Result<(), Erc721Error> {
+        if self.authority.get() != Address::from([0; 20]) {
+            if self.authority.get() != msg::sender() {
+                return Err(Erc721Error::Unauthorized(erc721::NotAuthority { from: msg::sender() }));
+            }
+        }
+        self.authority.set(_authority);
+        Ok(())
+    }
+
+    #[selector(name = "increDeriv")]
+    pub fn increment_derivatives(&mut self, token_id: U256) -> Result<U256, Erc721Error> {
+        if self.authority.get() != msg::sender() {
+            return Err(Erc721Error::Unauthorized(erc721::NotAuthority { from: msg::sender() }));
+        }
+        let mut cnt = self.cnt_deriv.setter(token_id);
+        let old_cnt = cnt.get();
+        cnt.set(old_cnt + U256::from(1));
+        Ok(cnt.get())
+    }
+
+    #[selector(name = "tokenURI")]
+    pub fn token_uri(&self, token_id: U256) -> Result<String, Erc721Error> {
+        self.erc721.owner_of(token_id)?; // require NFT exist
+        let uri = self.uris.get(token_id);
+        if uri.get_string().is_empty(){
+            Err(Erc721Error::NoURI(erc721::NoURITokenId { token_id }))
+        }else{
+            Ok(uri.get_string())
+        }
+    }
+
     pub fn authority(& self) -> Result<Address, Erc721Error> {
-        Ok(self.erc721.authority.get())
+        Ok(self.authority.get())
     }
 }

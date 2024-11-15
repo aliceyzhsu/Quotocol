@@ -39,6 +39,8 @@ sol_storage! {
         uint256 total_supply;
         /// Used to allow [`Erc721Params`]
         PhantomData<T> phantom;
+
+        address authority;
     }
 }
 
