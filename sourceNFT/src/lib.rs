@@ -60,10 +60,14 @@ pub enum StorageError {
 #[inherit(Erc721<SourceNFTParams>)]
 impl SourceNFT {
     /// Mints an NFT
-    pub fn mint(&mut self) -> Result<(), Erc721Error> {
+    pub fn mint(&mut self) -> Result<U256, Erc721Error> {
+        if self.authority.get() != msg::sender() {
+            return Err(Erc721Error::Unauthorized(erc721::NotAuthority { from: msg::sender() }));
+        }
         let minter = msg::sender();
         self.erc721.mint(minter)?;
-        Ok(())
+        let id = self.total_supply().unwrap_or(U256::from(1)) - U256::from(1); 
+        Ok(id)
     }
 
     /// Mints an NFT to another address
