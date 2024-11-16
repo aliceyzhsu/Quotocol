@@ -5,12 +5,22 @@ extern crate alloc;
 // Modules and imports
 mod erc721;
 
-use alloy_primitives::{U256, Address};
-/// Import the Stylus SDK along with alloy primitive types for use in our program.
 use stylus_sdk::{
-    msg, prelude::*, evm
+    msg, 
+    prelude::*, 
+    evm,
+    call::Call,
+    alloy_primitives::{U256, Address}
 };
+use alloy_sol_types::sol;
 use crate::erc721::{Erc721, Erc721Params, Erc721Error};
+
+sol_interface! {
+    interface Storage {
+        function setderivuri(uint256, string) external;
+        function getderivuri(uint256) external returns(string);
+    }
+}
 
 /// Immutable definitions
 struct DerivativeNFTParams;
@@ -19,17 +29,26 @@ impl Erc721Params for DerivativeNFTParams {
     const SYMBOL: &'static str = "DERIV";
 }
 
-// Define the entrypoint as a Solidity storage object. The sol_storage! macro
-// will generate Rust-equivalent structs with all fields mapped to Solidity-equivalent
-// storage slots and types.
 sol_storage! {
     #[entrypoint]
     struct DerivativeNFT {
-        #[borrow] // Allows erc721 to access StylusNFT's storage and make calls
+        #[borrow]
         Erc721<DerivativeNFTParams> erc721;
         address authority;
-        mapping(uint256 => string) uris;
+        address storage;
+        address source_contract_addr;
     }
+}
+
+sol! {
+    error ErrorSetURI();
+    error Unauthorized(address from);
+}
+
+#[derive(SolidityError)]
+pub enum StorageError {
+    ErrorSetURI(ErrorSetURI),
+    Unauthorized(Unauthorized),
 }
 
 #[public]
@@ -60,17 +79,17 @@ impl DerivativeNFT {
         Ok(self.erc721.total_supply.get())
     }
 
-    // #[selector(name = "setSrcContract")]
-    // pub fn set_source_contract(&mut self, contract_addr: Address) -> Result<(), Erc721Error> {
-    //     if self.authority.get() != msg::sender() {
-    //         return Err(Erc721Error::Unauthorized(erc721::NotAuthority { from: msg::sender() }));
-    //     }
-    //     evm::log(erc721::SrcContractSet{
-    //         src_contract_addr: contract_addr,
-    //     });
+    #[selector(name = "setSrcContract")]
+    pub fn set_source_contract(&mut self, contract_addr: Address) -> Result<(), Erc721Error> {
+        if self.authority.get() != msg::sender() {
+            return Err(Erc721Error::Unauthorized(erc721::NotAuthority { from: msg::sender() }));
+        }
+        evm::log(erc721::SrcContractSet{
+            src_contract_addr: contract_addr,
+        });
         
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
     #[selector(name = "setAuthority")]
     pub fn set_authority(&mut self, _authority: Address) -> Result<(), Erc721Error> {
@@ -88,34 +107,44 @@ impl DerivativeNFT {
         Ok(())
     }
 
-    #[selector(name = "setURI")]
-    pub fn set_uri(&mut self, token_id: U256, _uri: String) -> Result<(), Erc721Error> {
+    #[selector(name = "setStorage")]
+    pub fn set_storage(&mut self, addr: Address) -> Result<(), StorageError> {
         if self.authority.get() != msg::sender() {
-            return Err(Erc721Error::Unauthorized(erc721::NotAuthority { from: msg::sender() }));
+            return Err(StorageError::Unauthorized(Unauthorized { from: msg::sender() }));
         }
-        let mut uri = self.uris.setter(token_id);
-        uri.set_str(_uri);
-        // evm::log(erc721::URISet {
-        //     token_id: token_id,
-        //     uri: uri.get_string(),
-        // });
+        self.storage.set(addr);
+        Ok(())
+    }
+
+    #[selector(name = "setURI")]
+    pub fn set_uri(&mut self, token_id: U256, uri: String) -> Result<(), StorageError> {
+        if self.authority.get() != msg::sender() {
+            return Err(StorageError::Unauthorized(Unauthorized { from: msg::sender() }));
+        }
+        let storage_addr = self.storage.get();
+        let storage = Storage::new(storage_addr);
+        let config = Call::new();
+        storage.setderivuri(config, token_id, uri).map_err(|_e| StorageError::ErrorSetURI(ErrorSetURI {}))?;
         Ok(())
     }
 
     #[selector(name = "tokenURI")]
-    pub fn token_uri(&self, token_id: U256) -> Result<String, Erc721Error> {
-        self.erc721.owner_of(token_id)?; // require NFT exist
-        let uri = self.uris.get(token_id);
-        // if uri.get_string().is_empty(){
-        //     Err(Erc721Error::NoURI(erc721::NoURITokenId { token_id }))
-        // }else{
-        //     Ok(uri.get_string())
-        // }
-        Ok(uri.get_string())
+    pub fn token_uri(&self, token_id: U256) -> Result<String, StorageError> {
+        let storage_addr = self.storage.get();
+        let storage = Storage::new(storage_addr);
+        let config = Call::new();
+        let uri = storage.getderivuri(config, token_id)
+            .map_err(|_e| StorageError::ErrorSetURI(ErrorSetURI {}))?;
+        Ok(uri)
     }
     
     #[selector(name = "authority")]
     pub fn authority(&self) -> Address {
         self.authority.get()
+    }
+
+    #[selector(name = "storage")]
+    pub fn storage(&self) -> Address {
+        self.storage.get()
     }
 }

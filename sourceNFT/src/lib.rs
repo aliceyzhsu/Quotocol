@@ -5,12 +5,22 @@ extern crate alloc;
 // Modules and imports
 mod erc721;
 
-use alloy_primitives::{U256, Address};
 /// Import the Stylus SDK along with alloy primitive types for use in our program.
 use stylus_sdk::{
-    msg, prelude::*
+    msg, 
+    prelude::*, 
+    call::Call,
+    alloy_primitives::{U256, Address}
 };
+use alloy_sol_types::sol;
 use crate::erc721::{Erc721, Erc721Params, Erc721Error};
+
+sol_interface! {
+    interface Storage {
+        function setsrcuri(uint256, string) external;
+        function getsrcuri(uint256) external returns(string);
+    }
+}
 
 /// Immutable definitions
 struct SourceNFTParams;
@@ -29,11 +39,21 @@ sol_storage! {
         Erc721<SourceNFTParams> erc721;
 
         address authority;
-        /// token_id to tokenURI
-        mapping(uint256 => string) uris;
+        address storage;
         /// token_id to derivatives count
         mapping(uint256 => uint256) cnt_deriv;
     }
+}
+
+sol! {
+    error ErrorSetURI();
+    error Unauthorized(address from);
+}
+
+#[derive(SolidityError)]
+pub enum StorageError {
+    ErrorSetURI(ErrorSetURI),
+    Unauthorized(Unauthorized),
 }
 
 #[public]
@@ -64,13 +84,24 @@ impl SourceNFT {
         Ok(self.erc721.total_supply.get())
     }
 
-    #[selector(name = "setURI")]
-    pub fn set_uri(&mut self, token_id: U256, _uri: String) -> Result<(), Erc721Error> {
+    #[selector(name = "setStorage")]
+    pub fn set_storage(&mut self, addr: Address) -> Result<(), StorageError> {
         if self.authority.get() != msg::sender() {
-            return Err(Erc721Error::Unauthorized(erc721::NotAuthority { from: msg::sender() }));
+            return Err(StorageError::Unauthorized(Unauthorized { from: msg::sender() }));
         }
-        let mut uri = self.uris.setter(token_id);
-        uri.set_str(_uri);
+        self.storage.set(addr);
+        Ok(())
+    }
+
+    #[selector(name = "setURI")]
+    pub fn set_uri(&mut self, token_id: U256, uri: String) -> Result<(), StorageError> {
+        if self.authority.get() != msg::sender() {
+            return Err(StorageError::Unauthorized(Unauthorized { from: msg::sender() }));
+        }
+        let storage_addr = self.storage.get();
+        let storage = Storage::new(storage_addr);
+        let config = Call::new();
+        storage.setsrcuri(config, token_id, uri).map_err(|_e| StorageError::ErrorSetURI(ErrorSetURI {}))?;
         Ok(())
     }
 
@@ -97,17 +128,22 @@ impl SourceNFT {
     }
 
     #[selector(name = "tokenURI")]
-    pub fn token_uri(&self, token_id: U256) -> Result<String, Erc721Error> {
-        self.erc721.owner_of(token_id)?; // require NFT exist
-        let uri = self.uris.get(token_id);
-        if uri.get_string().is_empty(){
-            Err(Erc721Error::NoURI(erc721::NoURITokenId { token_id }))
-        }else{
-            Ok(uri.get_string())
-        }
+    pub fn token_uri(&self, token_id: U256) -> Result<String, StorageError> {
+        let storage_addr = self.storage.get();
+        let storage = Storage::new(storage_addr);
+        let config = Call::new();
+        let uri = storage.getsrcuri(config, token_id)
+            .map_err(|_e| StorageError::ErrorSetURI(ErrorSetURI {}))?;
+        Ok(uri)
     }
 
-    pub fn authority(& self) -> Result<Address, Erc721Error> {
-        Ok(self.authority.get())
+    #[selector(name = "authority")]
+    pub fn authority(&self) -> Address {
+        self.authority.get()
+    }
+
+    #[selector(name = "storage")]
+    pub fn storage(&self) -> Address {
+        self.storage.get()
     }
 }
