@@ -122,18 +122,21 @@ const QuoteForm = () => {
             {/* Step 2: Confirmation */}
             {currentStep === 2 && (
                 <div className="space-y-6">
-                    <div className="p-4 bg-gray-50 rounded-lg space-y-2">
-                        <div className="font-medium">NFT ID</div>
-                        <div className="break-all">{nftId}</div>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg space-y-2">
-                        <div className="font-medium">Quote Content</div>
-                        <div className="break-all whitespace-pre-wrap">{quoteContent}</div>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg space-y-2">
-                        <div className="font-medium">Wallet Address</div>
-                        <div className="font-mono text-sm">{primaryWallet?.address || 'No wallet connected'}</div>
-                    </div>
+                    <div className="p-6 bg-gray-50 rounded-lg divide-y divide-gray-200">
+						<div className="pb-4">
+							<div className="font-medium text-gray-600">NFT ID</div>
+							<div className="break-all mt-1">{nftId}</div>
+						</div>
+						<div className="py-4">
+							<div className="font-medium text-gray-600">Quote Content</div>
+							<div className="break-all mt-1">{quoteContent}</div>
+						</div>
+						<div className="pt-4">
+							<div className="font-medium text-gray-600">Wallet Address</div>
+							<div className="font-mono text-sm mt-1">{primaryWallet?.address || 'No wallet connected'}</div>
+						</div>
+					</div>
+                    
                     <div className="flex gap-4">
                         <button
                             onClick={handlePrevStep}
@@ -143,8 +146,6 @@ const QuoteForm = () => {
                         </button>
                         <div className="w-1/2">
                             <MintBtn
-                                nftId={nftId}
-                                quoteContent={quoteContent}
                                 disabled={!isAuthenticated}
                             />
                         </div>

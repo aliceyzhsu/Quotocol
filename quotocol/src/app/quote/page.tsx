@@ -12,10 +12,10 @@ export default function QuotePage() {
                 <div className="max-w-3xl mx-auto space-y-8">
                     <div className="text-center space-y-2">
                         <h1 className="text-3xl font-bold text-gray-900">
-                            Archive Your Content
+                            Quote A Content
                         </h1>
                         <p className="text-gray-600">
-                            Create a permanent record of your content as a SourceNFT
+                            Quote a content from a SourceNFT and make it permanent
                         </p>
                     </div>
 
